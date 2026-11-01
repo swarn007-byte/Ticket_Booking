@@ -2,22 +2,24 @@ package booking
 
 import (
 	"context"
+	"crypto/rand"
 	"sync"
+	"time"
 )
+
+const idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type MemoryStore struct {
 	mu       sync.RWMutex
 	bookings map[string]Booking
 }
 
-// NewMemoryStore initialises the thread-safe memory store.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		bookings: make(map[string]Booking),
 	}
 }
 
-// Book handles thread-safe booking with a composite key (MovieID + SeatID).
 func (s *MemoryStore) Book(b Booking) (Booking, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -27,11 +29,13 @@ func (s *MemoryStore) Book(b Booking) (Booking, error) {
 		return Booking{}, SeatAlreadyAllocated
 	}
 
+	b.ID = generateUniqueID()
+	b.Status = StatusHeld
+	b.ExpiresAt = time.Now().Add(5 * time.Minute)
 	s.bookings[key] = b
 	return b, nil
 }
 
-// ListBookings returns all bookings for a specific movie thread-safely.
 func (s *MemoryStore) ListBookings(movieID string) []Booking {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -45,12 +49,59 @@ func (s *MemoryStore) ListBookings(movieID string) []Booking {
 	return result
 }
 
-// Confirm handles session confirmation (Milestone 4 placeholder).
 func (s *MemoryStore) Confirm(ctx context.Context, sessionID string, userID string) (Booking, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for key, b := range s.bookings {
+		if b.ID != sessionID {
+			continue
+		}
+		if b.UserID != userID {
+			return Booking{}, ErrUnauthorized
+		}
+		if b.Status != StatusHeld {
+			return Booking{}, ErrSessionsNotFound
+		}
+		if time.Now().After(b.ExpiresAt) {
+			return Booking{}, ErrSessionsNotFound
+		}
+
+		b.Status = StatusConfirmed
+		s.bookings[key] = b
+		return b, nil
+	}
 	return Booking{}, ErrSessionsNotFound
 }
 
-// Release handles releasing a hold (Milestone 4 placeholder).
 func (s *MemoryStore) Release(ctx context.Context, sessionID string, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for key, b := range s.bookings {
+		if b.ID != sessionID {
+			continue
+		}
+		if b.UserID != userID {
+			return ErrUnauthorized
+		}
+		if b.Status != StatusHeld {
+			return ErrSessionsNotFound
+		}
+
+		delete(s.bookings, key)
+		return nil
+	}
 	return ErrSessionsNotFound
+}
+
+func generateUniqueID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "fallback-id"
+	}
+	for i := range b {
+		b[i] = idAlphabet[int(b[i])%len(idAlphabet)]
+	}
+	return string(b)
 }
