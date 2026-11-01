@@ -38,6 +38,31 @@ func (s *MemoryStore) Book(b Booking) (Booking, error) {
 	return b, nil
 }
 
+//2rd list booking .. of a movie
+func (s *MemoryStore) ListBookings(movieID string) []Booking {
+	var result []Booking
+	// if s.bookings[MovieID]{
+
+	// }
+	for _,b := range s.bookings{
+		if b.MovieID=movieID{
+			result=append(result,b)
+		}
+	}
+	return result
+}                                
+
+//
+
+func (s *MemoryStore) Confirm(ctx context.Context, sessionID string, userID string) (Booking, error) {
+	// TODO Milestone 4 — for now pretend it works
+	return Booking{}, ErrSessionNotFound
+}
+
+func (s *MemoryStore) Release(ctx context.Context, sessionID string, userID string) error {
+	// TODO Milestone 4
+	return ErrSessionNotFound
+}
 
 
 
