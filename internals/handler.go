@@ -6,20 +6,15 @@ import (
 )
 
 type Handler struct {
-	store *MemoryStore
+	store BookingStore
 }
 
-func NewHandler(store *MemoryStore) *Handler {
+func NewHandler(store BookingStore) *Handler {
 	return &Handler{store: store}
 }
 
-//register routes
-
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	//here we book a seat
 	mux.HandleFunc("POST /bookings", h.handleBookSeat)
-
-	//list bookings for a movie
 	mux.HandleFunc("GET /movies/{movieID}/bookings", h.handleListBookings)
 }
 
@@ -31,7 +26,6 @@ type BookRequest struct {
 
 func (h *Handler) handleBookSeat(w http.ResponseWriter, r *http.Request) {
 	var req BookRequest
-	// Decode incoming JSON body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -54,8 +48,29 @@ func (h *Handler) handleBookSeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return success JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w.Encode(result))
+
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *Handler) handleListBookings(w http.ResponseWriter, r *http.Request) {
+	movieID := r.PathValue("movieID")
+	if movieID == "" {
+		http.Error(w, "Missing movieID", http.StatusBadRequest)
+		return
+	}
+
+	bookings := h.store.ListBookings(movieID)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Yahan dhyan dena: json.NewEncoder(w) ke andar w dena hai, w.Encode nahi!
+	if err := json.NewEncoder(w).Encode(bookings); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
