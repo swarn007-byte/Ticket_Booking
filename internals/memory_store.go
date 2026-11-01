@@ -1,72 +1,56 @@
 package booking
 
-// type memorystore struct{
-// 	bookings map[string]bookings
-// }
+import (
+	"context"
+	"sync"
+)
 
-// func newmemorystore() *memorystore{
-// 	return &memorystore{
-// 		bookings map[string]bookings{}
-// 	}
-// }
-
-// func() book(b booking)error
-// func() list_bookings(movie_id string)[]booking
-// func() list_all_detail(id string)[]booking
-
-import context
-
-
-type MemoryStore struct{
+type MemoryStore struct {
+	mu       sync.RWMutex
 	bookings map[string]Booking
 }
 
-//1st function to initialise memory store.
-func NewMemoryStore *MemoryStore{
-	// bookings map[string]booking
+// NewMemoryStore initialises the thread-safe memory store.
+func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		bookings: map[string]Booking{}, // empty map, ready to use
+		bookings: make(map[string]Booking),
 	}
 }
 
-//2nd function to book ticket.
+// Book handles thread-safe booking with a composite key (MovieID + SeatID).
 func (s *MemoryStore) Book(b Booking) (Booking, error) {
-	if _, exists := s.bookings[b.SeatID]; exists {
-		return Booking{}, ErrSeatAlreadyBooked
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := b.MovieID + ":" + b.SeatID
+	if _, exists := s.bookings[key]; exists {
+		return Booking{}, SeatAlreadyAllocated
 	}
-	s.bookings[b.SeatID] = b
+
+	s.bookings[key] = b
 	return b, nil
 }
 
-//2rd list booking .. of a movie
+// ListBookings returns all bookings for a specific movie thread-safely.
 func (s *MemoryStore) ListBookings(movieID string) []Booking {
-	var result []Booking
-	// if s.bookings[MovieID]{
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	// }
-	for _,b := range s.bookings{
-		if b.MovieID=movieID{
-			result=append(result,b)
+	var result []Booking
+	for _, b := range s.bookings {
+		if b.MovieID == movieID {
+			result = append(result, b)
 		}
 	}
 	return result
-}                                
+}
 
-//
-
+// Confirm handles session confirmation (Milestone 4 placeholder).
 func (s *MemoryStore) Confirm(ctx context.Context, sessionID string, userID string) (Booking, error) {
-	// TODO Milestone 4 — for now pretend it works
-	return Booking{}, ErrSessionNotFound
+	return Booking{}, ErrSessionsNotFound
 }
 
+// Release handles releasing a hold (Milestone 4 placeholder).
 func (s *MemoryStore) Release(ctx context.Context, sessionID string, userID string) error {
-	// TODO Milestone 4
-	return ErrSessionNotFound
+	return ErrSessionsNotFound
 }
-
-
-
-
-
-
-  
